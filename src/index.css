@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-aura-bg text-slate-100 font-body antialiased;
+    margin: 0;
+    background-image:
+      radial-gradient(60% 50% at 15% 0%, rgba(91, 140, 255, 0.18), transparent 60%),
+      radial-gradient(55% 45% at 100% 10%, rgba(168, 85, 247, 0.16), transparent 60%),
+      radial-gradient(45% 45% at 50% 100%, rgba(236, 72, 153, 0.12), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: rgba(168, 85, 247, 0.4);
+  }
+
+  /* Slim neon scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(91, 140, 255, 0.5) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(91, 140, 255, 0.4);
+    border-radius: 9999px;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-aura-panel border border-white/10 backdrop-blur-xl shadow-glass;
+  }
+
+  .glass-hover {
+    @apply transition-all duration-200 hover:border-white/25 hover:shadow-neon-soft;
+  }
+
+  .neon-text {
+    @apply bg-gradient-to-r from-aura-neon via-aura-violet to-aura-pink bg-clip-text text-transparent;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold
+      transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed
+      disabled:active:scale-100;
+  }
+
+  .btn-neon {
+    @apply btn text-white bg-gradient-to-r from-aura-neon to-aura-violet shadow-neon
+      hover:brightness-110;
+  }
+
+  .btn-ghost {
+    @apply btn glass glass-hover text-slate-100;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5
+      px-3 py-1 text-xs font-medium;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
