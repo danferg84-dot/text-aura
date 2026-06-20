@@ -5,7 +5,7 @@
 // we respond { sandbox: true } so the client falls back to offline templates.
 
 import Anthropic from '@anthropic-ai/sdk';
-import { PERSONA_MAP } from '../src/services/personas.js';
+import { PERSONA_PROMPTS } from './_prompts.js';
 import {
   checkRateLimit,
   getClientIp,
@@ -41,9 +41,9 @@ export default async function handler(req, res) {
     }
   }
   const { text, personaId } = body || {};
-  const persona = PERSONA_MAP[personaId];
+  const systemPrompt = PERSONA_PROMPTS[personaId];
 
-  if (!text || !persona) {
+  if (!text || !systemPrompt) {
     res.status(400).json({ error: 'Missing text or invalid persona' });
     return;
   }
@@ -70,7 +70,7 @@ export default async function handler(req, res) {
     const msg = await client.messages.create({
       model: MODEL,
       max_tokens: 1024,
-      system: `${persona.systemPrompt}\n\nRewrite the user's message in this voice. Output ONLY the transformed text — no preamble, no quotation marks, no commentary.`,
+      system: `${systemPrompt}\n\nRewrite the user's message in this voice. Output ONLY the transformed text — no preamble, no quotation marks, no commentary.`,
       messages: [{ role: 'user', content: text.slice(0, MAX_INPUT) }],
     });
     const block = msg.content.find((b) => b.type === 'text');
