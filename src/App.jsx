@@ -11,7 +11,7 @@ import PaywallModal from './components/PaywallModal';
 import TrophiesModal from './components/TrophiesModal';
 import InviteModal from './components/InviteModal';
 
-import { transformText, isSandboxMode } from './services/api';
+import { transformText, getLiveStatus } from './services/api';
 import {
   loadDB,
   saveDB,
@@ -44,6 +44,7 @@ export default function App() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [showTrophies, setShowTrophies] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [liveMode, setLiveMode] = useState(false);
 
   const previewRef = useRef(null);
   const redeemHandled = useRef(false);
@@ -52,6 +53,11 @@ export default function App() {
   useEffect(() => {
     saveDB(db);
   }, [db]);
+
+  // Detect whether live AI is available (key configured server-side).
+  useEffect(() => {
+    getLiveStatus().then(setLiveMode);
+  }, []);
 
   // Redeem an incoming referral (?ref=CODE) once, on first mount.
   useEffect(() => {
@@ -234,7 +240,7 @@ export default function App() {
         </div>
       </main>
 
-      <Footer sandbox={isSandboxMode} onAdminUnlock={handleAdminUnlock} />
+      <Footer sandbox={!liveMode} onAdminUnlock={handleAdminUnlock} />
 
       <PaywallModal
         open={showPaywall}
