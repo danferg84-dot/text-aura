@@ -116,4 +116,9 @@ This is a polished **front-end prototype**. All state lives in `localStorage`, w
 
 Recommended path to monetization: **backend proxy → accounts/auth → server-side limits & referrals → Stripe.** This repo is the front-end those services plug into.
 
+### Live AI + rate limiting
+
+- Live transforms run through [`api/transform.js`](api/transform.js), a Vercel serverless function holding `ANTHROPIC_API_KEY` server-side (set it in Vercel → Settings → Environment Variables; **no `VITE_` prefix**). Without it, the app runs Sandbox Demo Mode.
+- The endpoint is IP rate-limited ([`api/_ratelimit.js`](api/_ratelimit.js)) — best-effort in-memory by default. **To make it durable**, add a Vercel KV / Upstash Redis store to the project; the function auto-detects `KV_REST_API_URL` + `KV_REST_API_TOKEN` (or the `UPSTASH_REDIS_REST_*` equivalents) and switches to shared counters with no code change. Tune `RATE_MAX_REQUESTS` / `RATE_WINDOW_SECONDS` there.
+
 > Tip: keep the Aura Card watermark even on paid plans — every shared screenshot is free distribution. Set your real domain/handle in [`src/config.js`](src/config.js).

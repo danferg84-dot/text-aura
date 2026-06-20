@@ -6,6 +6,12 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { PERSONA_MAP } from '../src/services/personas.js';
+import {
+  checkRateLimit,
+  getClientIp,
+  RATE_WINDOW_SECONDS,
+  RATE_MAX_REQUESTS,
+} from './_ratelimit.js';
 
 // Model: claude-haiku-4-5 — fast + cheap ($1/$5 per 1M tokens), ideal for a
 // high-volume viral app doing short rewrites. Bump to 'claude-opus-4-8' for
@@ -43,6 +49,19 @@ export default async function handler(req, res) {
   }
   if (text.length > MAX_INPUT) {
     res.status(413).json({ error: 'Text too long' });
+    return;
+  }
+
+  // Rate limit by IP before spending any tokens. Over-limit requests get a 429;
+  // the client treats that as a non-OK response and falls back to the free
+  // offline templates, so the app keeps working without costing you money.
+  const ip = getClientIp(req);
+  const rl = await checkRateLimit(ip);
+  res.setHeader('X-RateLimit-Limit', RATE_MAX_REQUESTS);
+  res.setHeader('X-RateLimit-Remaining', rl.remaining);
+  if (!rl.allowed) {
+    res.setHeader('Retry-After', RATE_WINDOW_SECONDS);
+    res.status(429).json({ error: 'Too many requests. Please slow down.' });
     return;
   }
 
