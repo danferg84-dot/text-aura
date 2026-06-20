@@ -7,10 +7,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { PERSONA_MAP } from '../src/services/personas.js';
 
-// Model: claude-opus-4-8 is top quality. For a high-volume viral app, switching
-// this to 'claude-haiku-4-5' is ~5× cheaper and faster — plenty for one-line
-// rewrites. Your call (see the note in chat).
-const MODEL = 'claude-opus-4-8';
+// Model: claude-haiku-4-5 — fast + cheap ($1/$5 per 1M tokens), ideal for a
+// high-volume viral app doing short rewrites. Bump to 'claude-opus-4-8' for
+// max quality if you ever want it.
+const MODEL = 'claude-haiku-4-5';
 const MAX_INPUT = 2000; // basic abuse guard — cap input length
 
 export default async function handler(req, res) {
