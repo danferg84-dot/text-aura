@@ -31,7 +31,7 @@ import {
 } from './services/gamification';
 import { PERSONA_MAP, PERSONAS, isPersonaUnlocked } from './services/personas';
 import { shareText, shareImage } from './services/share';
-import { APP_URL, HANDLE, REFERRAL_BONUS } from './config';
+import { HANDLE, REFERRAL_BONUS } from './config';
 
 export default function App() {
   const [db, setDb] = useState(() => rollDailyUsage(loadDB()));
@@ -160,7 +160,7 @@ export default function App() {
       });
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('Failed to render image');
-      const caption = `My text, re-auraed ⚡ Try it: ${HANDLE} · ${APP_URL}`;
+      const caption = `My text, re-auraed ⚡ Try it: ${HANDLE} · ${window.location.origin}`;
       await shareImage(blob, `aura-card-${activePersona || 'text-aura'}.png`, caption);
     } catch (err) {
       console.error('[Text Aura] Aura Card export failed:', err);

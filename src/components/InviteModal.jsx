@@ -6,7 +6,9 @@ import { shareText, copyText } from '../services/share';
 
 export default function InviteModal({ open, onClose, db }) {
   const [copied, setCopied] = useState(false);
-  const link = `${APP_URL}/?ref=${db.referralCode}`;
+  // Use the live origin so invite links work on whatever domain we deploy to.
+  const origin = typeof window !== 'undefined' ? window.location.origin : APP_URL;
+  const link = `${origin}/?ref=${db.referralCode}`;
   const message = `I've been transforming my texts with Text Aura ⚡ Grab ${REFERRAL_BONUS} free shifts with my link: ${link}`;
 
   const handleCopy = async () => {
