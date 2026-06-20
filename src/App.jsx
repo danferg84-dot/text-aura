@@ -10,8 +10,10 @@ import ActionDashboard from './components/ActionDashboard';
 import PaywallModal from './components/PaywallModal';
 import TrophiesModal from './components/TrophiesModal';
 import InviteModal from './components/InviteModal';
+import AdRewardModal from './components/AdRewardModal';
 
-import { transformText, getLiveStatus } from './services/api';
+import { transformText, getLiveStatus, fetchUsage, grantAdReward } from './services/api';
+import { getDeviceId } from './services/device';
 import {
   loadDB,
   saveDB,
@@ -44,7 +46,9 @@ export default function App() {
   const [showPaywall, setShowPaywall] = useState(false);
   const [showTrophies, setShowTrophies] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [showAdOffer, setShowAdOffer] = useState(false);
   const [liveMode, setLiveMode] = useState(false);
+  const [usage, setUsage] = useState(null); // server usage (null = unmetered/local fallback)
 
   const previewRef = useRef(null);
   const redeemHandled = useRef(false);
@@ -54,10 +58,19 @@ export default function App() {
     saveDB(db);
   }, [db]);
 
-  // Detect whether live AI is available (key configured server-side).
+  // Detect whether live AI is available + load server-side usage for this device.
   useEffect(() => {
     getLiveStatus().then(setLiveMode);
+    getDeviceId(); // ensure an id exists; surface it for the UNLIMITED_DEVICE_IDS allowlist
+    // eslint-disable-next-line no-console
+    console.info('[Text Aura] device id:', getDeviceId());
+    refreshUsage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function refreshUsage() {
+    fetchUsage().then((u) => setUsage(u && u.managed ? u : null));
+  }
 
   // Redeem an incoming referral (?ref=CODE) once, on first mount.
   useEffect(() => {
@@ -84,8 +97,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const remaining = remainingFreeShifts(db);
+  // Server usage is the source of truth when metered; otherwise fall back to local.
+  const remaining = usage ? usage.remaining : remainingFreeShifts(db);
   const badge = output && activePersona ? activeBadgeTitle(db, activePersona) : null;
+
+  const outOfShifts = () => (usage ? usage.remaining <= 0 : remainingFreeShifts(db) <= 0);
 
   // Lock state + near-miss hints for every persona button.
   const personaMeta = useMemo(() => {
@@ -114,10 +130,11 @@ export default function App() {
     }
     if (!input.trim()) return;
 
-    // Paywall gate: block when out of free + bonus shifts.
-    if (remainingFreeShifts(db) <= 0) {
+    // Gate: out of shifts → offer an ad (if more can be earned today) or paywall.
+    if (outOfShifts()) {
       setActivePersona(personaId);
-      setShowPaywall(true);
+      if (usage?.adAvailable) setShowAdOffer(true);
+      else setShowPaywall(true);
       return;
     }
 
@@ -127,8 +144,18 @@ export default function App() {
     setAuraPing(null);
 
     try {
-      const { output: result } = await transformText(input, personaId);
-      setOutput(result);
+      const result = await transformText(input, personaId);
+
+      // Server says we're over the cap (race with the pre-gate) → ad or paywall.
+      if (result.limited) {
+        if (result.usage) setUsage(result.usage);
+        if (result.adAvailable) setShowAdOffer(true);
+        else setShowPaywall(true);
+        return;
+      }
+
+      setOutput(result.output);
+      if (result.usage) setUsage(result.usage);
 
       // Rewards: variable-ratio aura + crit jackpot + first-of-day bonus.
       const { amount: baseAura, crit } = rollAuraScore(db);
@@ -145,6 +172,13 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Rewarded-ad completion → grant bonus shifts (server-side when metered).
+  async function handleAdReward() {
+    const u = await grantAdReward();
+    if (u && u.managed) setUsage(u);
+    else refreshUsage();
   }
 
   // ── Send to Chat (Web Share → native share sheet / clipboard fallback) ─────
@@ -254,6 +288,15 @@ export default function App() {
       />
       <TrophiesModal open={showTrophies} onClose={() => setShowTrophies(false)} db={db} />
       <InviteModal open={showInvite} onClose={() => setShowInvite(false)} db={db} />
+      <AdRewardModal
+        open={showAdOffer}
+        onClose={() => setShowAdOffer(false)}
+        onReward={handleAdReward}
+        onUpgrade={() => {
+          setShowAdOffer(false);
+          setShowPaywall(true);
+        }}
+      />
     </div>
   );
 }

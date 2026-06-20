@@ -129,6 +129,32 @@ export function recordShift(db, personaId, { auraGained, karmaGained }) {
   return next;
 }
 
+/**
+ * Record an "Aura-fy all" carousel run. Counts as a single shift for the
+ * paywall/streak/aura (even though it transforms across many personas), and
+ * does not touch per-persona stats or karma.
+ */
+export function recordBatchShift(db, { auraGained }) {
+  let next = rollDailyUsage(db);
+
+  const freeRemaining = Math.max(0, DAILY_FREE_LIMIT - next.usage.count);
+  let bonusShifts = next.bonusShifts || 0;
+  if (!next.adminUnlimited && freeRemaining <= 0 && bonusShifts > 0) {
+    bonusShifts -= 1;
+  }
+
+  next = bumpStreak(next);
+
+  next = {
+    ...next,
+    totalShifts: next.totalShifts + 1,
+    auraScore: next.auraScore + (auraGained || 0),
+    usage: { ...next.usage, count: next.usage.count + 1 },
+    bonusShifts,
+  };
+  return next;
+}
+
 /** Admin backdoor / "Pro": grant unlimited shifts. */
 export function activateAdmin(db) {
   return { ...db, adminUnlimited: true };

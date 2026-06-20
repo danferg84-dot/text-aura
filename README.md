@@ -116,6 +116,17 @@ This is a polished **front-end prototype**. All state lives in `localStorage`, w
 
 Recommended path to monetization: **backend proxy → accounts/auth → server-side limits & referrals → Stripe.** This repo is the front-end those services plug into.
 
+### Accounts & server-side usage metering (Supabase)
+
+Free-tier limits are **server-enforced** so they can't be bypassed by clearing `localStorage`:
+
+- Run [`supabase/schema.sql`](supabase/schema.sql) once in the Supabase SQL editor (creates `usage_counters` + the `consume_generation` / `grant_ad_bonus` RPCs).
+- Set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in Vercel (server-side; the service-role key must never reach the browser).
+- Free tier = **3 generations/day → watch a rewarded ad for +3 → hard cap at 6/day → paywall**. Tune `FREE_BASE` / `FREE_CAP` / `AD_BONUS` in [`api/_db.js`](api/_db.js).
+- Metering is anonymous (by device id + IP) — no signup wall on the free tier. Accounts/login come with the paid tiers (Stripe).
+- `UNLIMITED_DEVICE_IDS` (comma-separated) bypasses metering for your own testing — the app logs your device id to the console.
+- ⚠️ The ad-reward endpoint ([`api/ad-reward.js`](api/ad-reward.js)) currently **trusts the client**. Before launch, gate it behind real rewarded-ad server-side verification (e.g. AdMob SSV) so it can't be called to mint free shifts.
+
 ### Live AI + rate limiting
 
 - Live transforms run through [`api/transform.js`](api/transform.js), a Vercel serverless function holding `ANTHROPIC_API_KEY` server-side (set it in Vercel → Settings → Environment Variables; **no `VITE_` prefix**). Without it, the app runs Sandbox Demo Mode.

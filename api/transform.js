@@ -12,6 +12,7 @@ import {
   RATE_WINDOW_SECONDS,
   RATE_MAX_REQUESTS,
 } from './_ratelimit.js';
+import { db, hasDb, FREE_BASE, FREE_CAP, isUnlimitedDevice } from './_db.js';
 
 // Model: claude-haiku-4-5 — fast + cheap ($1/$5 per 1M tokens), ideal for a
 // high-volume viral app doing short rewrites. Bump to 'claude-opus-4-8' for
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
       body = {};
     }
   }
-  const { text, personaId } = body || {};
+  const { text, personaId, deviceId } = body || {};
   const systemPrompt = PERSONA_PROMPTS[personaId];
 
   if (!text || !systemPrompt) {
@@ -63,6 +64,45 @@ export default async function handler(req, res) {
     res.setHeader('Retry-After', RATE_WINDOW_SECONDS);
     res.status(429).json({ error: 'Too many requests. Please slow down.' });
     return;
+  }
+
+  // Server-enforced free-tier metering (the real cost ceiling). Consumes one
+  // generation atomically before we spend any tokens. Over the cap → 200 with
+  // { limit: true } and we never call the model.
+  let usageOut = null;
+  if (hasDb && !isUnlimitedDevice(deviceId)) {
+    if (!deviceId) {
+      res.status(400).json({ error: 'Missing deviceId' });
+      return;
+    }
+    try {
+      const { data, error } = await db.rpc('consume_generation', {
+        p_device: deviceId,
+        p_ip: ip,
+        p_base: FREE_BASE,
+        p_cap: FREE_CAP,
+      });
+      if (!error && data) {
+        const row = Array.isArray(data) ? data[0] : data;
+        const adAvailable = FREE_BASE + row.ad_bonus < FREE_CAP;
+        const remaining = Math.max(0, row.allowance - row.used);
+        usageOut = {
+          managed: true,
+          used: row.used,
+          allowance: row.allowance,
+          remaining,
+          adBonus: row.ad_bonus,
+          adAvailable,
+        };
+        if (!row.allowed) {
+          res.status(200).json({ limit: true, adAvailable, usage: usageOut });
+          return;
+        }
+      }
+      // On a DB error we fail open (allow) — the IP rate limit is still a guard.
+    } catch (e) {
+      console.error('[transform] meter error:', e?.message || e);
+    }
   }
 
   try {
@@ -94,7 +134,7 @@ Rules:
       res.status(200).json({ sandbox: true });
       return;
     }
-    res.status(200).json({ output, mode: 'live' });
+    res.status(200).json({ output, mode: 'live', usage: usageOut });
   } catch (err) {
     console.error('[transform] error:', err?.message || err);
     // Resilient fallback — never leave the user stranded.
