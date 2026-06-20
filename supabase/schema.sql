@@ -14,6 +14,8 @@ create table if not exists usage_counters (
 
 -- Atomically consume one generation. Resets the counter on a new UTC day.
 -- Returns whether it was allowed plus the post-state.
+-- (Table columns are alias-qualified (uc.) so they never collide with the
+--  same-named OUT parameters, e.g. ad_bonus.)
 create or replace function consume_generation(
   p_device text, p_ip text, p_base int, p_cap int
 ) returns table(allowed boolean, used int, ad_bonus int, allowance int)
@@ -29,24 +31,26 @@ begin
     on conflict (device_id) do nothing;
 
   -- Lock the row, then reset if the day rolled over.
-  perform 1 from usage_counters where device_id = p_device for update;
-  update usage_counters
+  perform 1 from usage_counters uc where uc.device_id = p_device for update;
+  update usage_counters uc
     set day = v_day, count = 0, ad_bonus = 0
-    where device_id = p_device and day <> v_day;
+    where uc.device_id = p_device and uc.day <> v_day;
 
-  select count, ad_bonus into v_count, v_bonus
-    from usage_counters where device_id = p_device;
+  select uc.count, uc.ad_bonus into v_count, v_bonus
+    from usage_counters uc where uc.device_id = p_device;
 
   v_allow := least(p_base + v_bonus, p_cap);
 
   if v_count >= v_allow then
-    update usage_counters set last_ip = p_ip, updated_at = now() where device_id = p_device;
-    return query select false, v_count, v_bonus, v_allow;
+    update usage_counters uc set last_ip = p_ip, updated_at = now()
+      where uc.device_id = p_device;
+    allowed := false; used := v_count; ad_bonus := v_bonus; allowance := v_allow;
   else
-    update usage_counters set count = count + 1, last_ip = p_ip, updated_at = now()
-      where device_id = p_device;
-    return query select true, v_count + 1, v_bonus, v_allow;
+    update usage_counters uc set count = uc.count + 1, last_ip = p_ip, updated_at = now()
+      where uc.device_id = p_device;
+    allowed := true; used := v_count + 1; ad_bonus := v_bonus; allowance := v_allow;
   end if;
+  return next;
 end;
 $$;
 
@@ -65,18 +69,20 @@ begin
   insert into usage_counters(device_id, day) values (p_device, v_day)
     on conflict (device_id) do nothing;
 
-  perform 1 from usage_counters where device_id = p_device for update;
-  update usage_counters
+  perform 1 from usage_counters uc where uc.device_id = p_device for update;
+  update usage_counters uc
     set day = v_day, count = 0, ad_bonus = 0
-    where device_id = p_device and day <> v_day;
+    where uc.device_id = p_device and uc.day <> v_day;
 
-  update usage_counters
-    set ad_bonus = least(ad_bonus + p_inc, v_maxbonus), updated_at = now()
-    where device_id = p_device;
+  update usage_counters uc
+    set ad_bonus = least(uc.ad_bonus + p_inc, v_maxbonus), updated_at = now()
+    where uc.device_id = p_device;
 
-  select count, ad_bonus into v_count, v_bonus
-    from usage_counters where device_id = p_device;
+  select uc.count, uc.ad_bonus into v_count, v_bonus
+    from usage_counters uc where uc.device_id = p_device;
   v_allow := least(p_base + v_bonus, p_cap);
-  return query select v_count, v_bonus, v_allow;
+
+  used := v_count; ad_bonus := v_bonus; allowance := v_allow;
+  return next;
 end;
 $$;
