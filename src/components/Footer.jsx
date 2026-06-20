@@ -1,26 +1,8 @@
-import { useRef, useState } from 'react';
-
-// Clicking the copyright text 5× consecutively unlocks Admin Mode.
-const REQUIRED_CLICKS = 5;
-const RESET_MS = 1500; // clicks must be reasonably consecutive
+import useSecretTaps from '../hooks/useSecretTaps';
 
 export default function Footer({ sandbox, onAdminUnlock }) {
-  const [count, setCount] = useState(0);
-  const timer = useRef(null);
-
-  const handleClick = () => {
-    const next = count + 1;
-    clearTimeout(timer.current);
-
-    if (next >= REQUIRED_CLICKS) {
-      setCount(0);
-      onAdminUnlock();
-      return;
-    }
-
-    setCount(next);
-    timer.current = setTimeout(() => setCount(0), RESET_MS);
-  };
+  // Tapping the copyright text 5× consecutively unlocks Admin Mode.
+  const { count, required, onTap } = useSecretTaps(onAdminUnlock);
 
   return (
     <footer className="mx-auto max-w-2xl px-4 pb-10 pt-6 text-center">
@@ -32,12 +14,17 @@ export default function Footer({ sandbox, onAdminUnlock }) {
         </p>
       )}
       <button
-        onClick={handleClick}
+        onClick={onTap}
         className="select-none text-xs text-slate-500 transition hover:text-slate-400"
         title="Text Aura"
       >
         © {new Date().getFullYear()} Text Aura · Transform your vibe ✨
       </button>
+      {count > 0 && (
+        <div className="mt-1 text-[10px] text-aura-violet/80">
+          🔓 Admin unlock: {count}/{required} taps…
+        </div>
+      )}
     </footer>
   );
 }

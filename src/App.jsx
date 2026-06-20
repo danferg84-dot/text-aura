@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 
 import Header from './components/Header';
@@ -9,6 +9,7 @@ import ChatPreview from './components/ChatPreview';
 import ActionDashboard from './components/ActionDashboard';
 import PaywallModal from './components/PaywallModal';
 import TrophiesModal from './components/TrophiesModal';
+import InviteModal from './components/InviteModal';
 
 import { transformText, isSandboxMode } from './services/api';
 import {
@@ -18,12 +19,19 @@ import {
   remainingFreeShifts,
   recordShift,
   activateAdmin,
+  redeemReferral,
+  isFirstShiftToday,
+  DAILY_BONUS_AURA,
 } from './services/storage';
 import {
   rollAuraScore,
   karmaForPersona,
   activeBadgeTitle,
+  rankUpHint,
 } from './services/gamification';
+import { PERSONA_MAP, PERSONAS, isPersonaUnlocked } from './services/personas';
+import { shareText, shareImage } from './services/share';
+import { APP_URL, HANDLE, REFERRAL_BONUS } from './config';
 
 export default function App() {
   const [db, setDb] = useState(() => rollDailyUsage(loadDB()));
@@ -31,26 +39,76 @@ export default function App() {
   const [output, setOutput] = useState('');
   const [activePersona, setActivePersona] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [sharingCard, setSharingCard] = useState(false);
   const [auraPing, setAuraPing] = useState(null);
   const [showPaywall, setShowPaywall] = useState(false);
   const [showTrophies, setShowTrophies] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
 
   const previewRef = useRef(null);
+  const redeemHandled = useRef(false);
 
   // Persist the DB whenever it changes.
   useEffect(() => {
     saveDB(db);
   }, [db]);
 
+  // Redeem an incoming referral (?ref=CODE) once, on first mount.
+  useEffect(() => {
+    if (redeemHandled.current) return;
+    redeemHandled.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (!ref) return;
+
+    const { db: next, redeemed } = redeemReferral(db, ref);
+    if (redeemed) {
+      setDb(next);
+      setTimeout(
+        () =>
+          // eslint-disable-next-line no-alert
+          alert(`🎁 You scored ${REFERRAL_BONUS} bonus shifts from a friend! Welcome to Text Aura ⚡`),
+        150
+      );
+    }
+    params.delete('ref');
+    const qs = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const remaining = remainingFreeShifts(db);
   const badge = output && activePersona ? activeBadgeTitle(db, activePersona) : null;
+
+  // Lock state + near-miss hints for every persona button.
+  const personaMeta = useMemo(() => {
+    const map = {};
+    for (const p of PERSONAS) {
+      const unlocked = isPersonaUnlocked(db, p);
+      map[p.id] = {
+        unlocked,
+        locked: !unlocked,
+        unlocksAt: p.unlocksAt,
+        hint: unlocked ? rankUpHint(db, p.id) : null,
+      };
+    }
+    return map;
+  }, [db]);
 
   // ── Core: run a transformation ─────────────────────────────────────────────
   async function handleSelectPersona(personaId) {
     if (loading) return;
 
-    // Paywall gate: block on the 6th shift of the day.
+    const persona = PERSONA_MAP[personaId];
+    if (!isPersonaUnlocked(db, persona)) {
+      // Locked persona → nudge toward Pro (which unlocks all personas).
+      setShowPaywall(true);
+      return;
+    }
+    if (!input.trim()) return;
+
+    // Paywall gate: block when out of free + bonus shifts.
     if (remainingFreeShifts(db) <= 0) {
       setActivePersona(personaId);
       setShowPaywall(true);
@@ -66,14 +124,16 @@ export default function App() {
       const { output: result } = await transformText(input, personaId);
       setOutput(result);
 
-      // Award gamification rewards and record the shift.
-      const auraGained = rollAuraScore(db);
+      // Rewards: variable-ratio aura + crit jackpot + first-of-day bonus.
+      const { amount: baseAura, crit } = rollAuraScore(db);
+      const daily = isFirstShiftToday(db);
+      const auraGained = baseAura + (daily ? DAILY_BONUS_AURA : 0);
       const karmaGained = karmaForPersona(personaId);
+
       setDb((prev) => recordShift(prev, personaId, { auraGained, karmaGained }));
-      setAuraPing({ id: Date.now(), amount: auraGained });
+      setAuraPing({ id: Date.now(), amount: auraGained, crit, daily });
     } catch (err) {
       setOutput('');
-      // Surface the (rare) hard failure without crashing the app.
       // eslint-disable-next-line no-alert
       alert(err?.message || 'Something went wrong transforming your text.');
     } finally {
@@ -81,10 +141,16 @@ export default function App() {
     }
   }
 
-  // ── Download Aura Card (social-ready screenshot) ──────────────────────────
-  async function handleDownloadCard() {
+  // ── Send to Chat (Web Share → native share sheet / clipboard fallback) ─────
+  async function handleCopySwitch() {
+    if (!output) return 'failed';
+    return shareText(output);
+  }
+
+  // ── Share / Download the branded Aura Card ─────────────────────────────────
+  async function handleShareCard() {
     if (!previewRef.current || !output) return;
-    setDownloading(true);
+    setSharingCard(true);
     try {
       const canvas = await html2canvas(previewRef.current, {
         backgroundColor: '#0b0b1a',
@@ -92,33 +158,34 @@ export default function App() {
         useCORS: true,
         logging: false,
       });
-      const link = document.createElement('a');
-      link.download = `aura-card-${activePersona || 'text-aura'}-${Date.now()}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Failed to render image');
+      const caption = `My text, re-auraed ⚡ Try it: ${HANDLE} · ${APP_URL}`;
+      await shareImage(blob, `aura-card-${activePersona || 'text-aura'}.png`, caption);
     } catch (err) {
       console.error('[Text Aura] Aura Card export failed:', err);
       // eslint-disable-next-line no-alert
       alert('Could not generate the Aura Card. Please try again.');
     } finally {
-      setDownloading(false);
+      setSharingCard(false);
     }
   }
 
-  // ── Admin backdoor ─────────────────────────────────────────────────────────
+  // ── Admin backdoor / "Pro" ─────────────────────────────────────────────────
   function handleAdminUnlock() {
     setDb((prev) => activateAdmin(prev));
     setShowPaywall(false);
     // eslint-disable-next-line no-alert
-    alert('Admin Mode Activated — unlimited free shifts unlocked! ⚡');
+    alert('Admin Mode Activated — unlimited shifts + all personas unlocked! ⚡');
   }
 
-  // ── "Subscribe" (simulated) ────────────────────────────────────────────────
   function handleSubscribe(planId) {
-    setDb((prev) => activateAdmin(prev)); // simulate a successful purchase → unlimited
+    setDb((prev) => activateAdmin(prev)); // simulate a successful purchase → Pro
     setShowPaywall(false);
     // eslint-disable-next-line no-alert
-    alert(`🎉 Welcome to Text Aura ${planId === 'annual' ? 'Legend' : 'Pro'}! Unlimited shifts unlocked.`);
+    alert(
+      `🎉 Welcome to Text Aura ${planId === 'annual' ? 'Legend' : 'Pro'}! Unlimited shifts + every persona unlocked.`
+    );
   }
 
   return (
@@ -126,7 +193,9 @@ export default function App() {
       <Header
         streak={db.streak}
         remaining={remaining}
+        aura={db.auraScore}
         onOpenTrophies={() => setShowTrophies(true)}
+        onOpenInvite={() => setShowInvite(true)}
       />
 
       <main className="mx-auto w-full max-w-2xl flex-1 space-y-6 px-4 py-5">
@@ -144,15 +213,14 @@ export default function App() {
 
         <ActionDashboard
           output={output}
-          onDownloadCard={handleDownloadCard}
-          downloading={downloading}
+          onCopySwitch={handleCopySwitch}
+          onShareCard={handleShareCard}
+          sharingCard={sharingCard}
         />
 
         <div>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-base font-bold text-slate-200">
-              Pick your aura
-            </h2>
+            <h2 className="font-display text-base font-bold text-slate-200">Pick your aura</h2>
             {!input.trim() && (
               <span className="text-xs text-amber-300/80">↑ type a message first</span>
             )}
@@ -161,6 +229,7 @@ export default function App() {
             activeId={activePersona}
             onSelect={handleSelectPersona}
             disabled={!input.trim() || loading}
+            meta={personaMeta}
           />
         </div>
       </main>
@@ -171,8 +240,14 @@ export default function App() {
         open={showPaywall}
         onClose={() => setShowPaywall(false)}
         onSubscribe={handleSubscribe}
+        onAdminUnlock={handleAdminUnlock}
+        onInvite={() => {
+          setShowPaywall(false);
+          setShowInvite(true);
+        }}
       />
       <TrophiesModal open={showTrophies} onClose={() => setShowTrophies(false)} db={db} />
+      <InviteModal open={showInvite} onClose={() => setShowInvite(false)} db={db} />
     </div>
   );
 }

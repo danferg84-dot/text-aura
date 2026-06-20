@@ -142,12 +142,36 @@ export function karmaForPersona(personaId) {
   return personaId === 'de-claw' || personaId === 'corporate-polish' ? KARMA_PER_USE : 0;
 }
 
+// Chance of a "CRITICAL HIT" jackpot (variable-ratio reward → addictive).
+export const CRIT_CHANCE = 0.12;
+export const CRIT_MULTIPLIER = 3;
+
 /**
  * A fun, semi-random "+Aura" score for the post-transform animation.
- * Scales gently with total experience so veterans see bigger numbers.
+ * Scales gently with total experience and occasionally lands a 3× crit.
+ * @returns {{ amount: number, crit: boolean, multiplier: number }}
  */
 export function rollAuraScore(db) {
   const base = 500 + Math.floor(Math.random() * 2500); // 500–3000
   const veteranBonus = Math.min(2000, (db.totalShifts || 0) * 25);
-  return Math.round((base + veteranBonus) / 50) * 50; // round to nearest 50
+  let amount = Math.round((base + veteranBonus) / 50) * 50; // round to nearest 50
+
+  const crit = Math.random() < CRIT_CHANCE;
+  if (crit) amount *= CRIT_MULTIPLIER;
+
+  return { amount, crit, multiplier: crit ? CRIT_MULTIPLIER : 1 };
+}
+
+/**
+ * A short "near-miss" nudge for a persona's button, or null.
+ * Surfaces "N to rank up" when a badge-path persona is close to the next tier.
+ */
+export function rankUpHint(db, personaId, within = 3) {
+  const path = BADGE_PATH_MAP[personaId];
+  if (!path) return null;
+  const status = pathStatus(db, path);
+  if (!status.next) return null;
+  const gap = status.next.min - status.value;
+  if (gap <= 0 || gap > within) return null;
+  return `${gap} to rank up`;
 }

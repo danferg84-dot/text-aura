@@ -2,17 +2,12 @@
 // Each persona carries:
 //   - id / name / emoji / category / accent (UI)
 //   - systemPrompt: bounded directive sent to the LLM (live mode)
-//   - sandbox(text): client-side curated template (Sandbox Demo Mode fallback)
+//   - sandbox(text): offline transform (Sandbox Demo Mode fallback)
 //
-// Categories: "utilities" | "pop" | "stereotypes"
+// The sandbox transforms live in ./sandbox.js (rule-based vocabulary swaps +
+// tone restructuring). Categories: "utilities" | "pop" | "stereotypes".
 
-const cap = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
-const sentences = (t) =>
-  t
-    .replace(/\s+/g, ' ')
-    .trim()
-    .split(/(?<=[.!?])\s+/)
-    .filter(Boolean);
+import { SANDBOX } from './sandbox';
 
 export const CATEGORIES = [
   { id: 'utilities', label: 'Utilities' },
@@ -31,13 +26,7 @@ export const PERSONAS = [
     karmaPath: true,
     systemPrompt:
       'Strip all anger or passive-aggression out, outputting a perfectly diplomatic and safe text. Preserve the core request and meaning. Keep it calm, kind, and professional.',
-    sandbox: (text) =>
-      `Hi! I hope you're doing well. I wanted to gently share something: ${sentences(
-        text
-      )
-        .map((s) => s.replace(/!+/g, '.').toLowerCase())
-        .map(cap)
-        .join(' ')} I really appreciate your understanding, and I'm happy to talk it through whenever works for you. Thank you so much! 🙏`,
+    sandbox: SANDBOX['de-claw'],
   },
   {
     id: 'corporate-polish',
@@ -48,14 +37,7 @@ export const PERSONAS = [
     karmaPath: true,
     systemPrompt:
       'Translate text into highly polished, elite corporate passive-aggressive workplace correspondence. Use buzzwords, hedging, and a veneer of professionalism.',
-    sandbox: (text) =>
-      `Hi team,\n\nPer my last message and circling back on this: ${sentences(
-        text
-      )
-        .map(cap)
-        .join(
-          ' '
-        )} I want to make sure we're aligned and leveraging our synergies moving forward. Happy to take this offline if helpful.\n\nBest,\nSent from my iPhone`,
+    sandbox: SANDBOX['corporate-polish'],
   },
 
   // ── Pop Culture ────────────────────────────────────────────────────────────
@@ -67,12 +49,7 @@ export const PERSONAS = [
     accent: 'from-rose-400 to-red-500',
     systemPrompt:
       'Rewrite in the voice of a cheerful, squeaky, family-friendly cartoon mouse. Wholesome, giggly, full of "Oh boy!" energy. Do not use any real trademarked names.',
-    sandbox: (text) =>
-      `Oh boy, oh boy! Ha-ha! ${sentences(text)
-        .map(cap)
-        .join(
-          ' Hot dog! '
-        )} Gosh, that sure is swell! See ya real soon, pal! 🧀`,
+    sandbox: SANDBOX['cartoon-mouse'],
   },
   {
     id: 'dr-evil',
@@ -82,27 +59,17 @@ export const PERSONAS = [
     accent: 'from-zinc-300 to-slate-500',
     systemPrompt:
       'Rewrite as a campy supervillain monologuing about world domination. Dramatic, gleeful, faux-menacing, with air-quotes and a pinky to the lips. Keep it comedic, never genuinely threatening.',
-    sandbox: (text) =>
-      `Mwahaha! Allow me to explain my "diabolical" plan: ${sentences(text)
-        .map(cap)
-        .join(
-          ' '
-        )} ...and then I shall hold the world ransom for ONE... MILLION... dollars! 🦷 Throw me a frickin' bone here.`,
+    sandbox: SANDBOX['dr-evil'],
   },
   {
-    id: 'napoleon',
-    name: 'Napoleon',
-    emoji: '🎩',
+    id: 'drill-sergeant',
+    name: 'Drill Sergeant',
+    emoji: '🪖',
     category: 'pop',
-    accent: 'from-blue-400 to-indigo-600',
+    accent: 'from-green-500 to-emerald-700',
     systemPrompt:
-      'Rewrite as a grandiose 19th-century French emperor and military strategist. Imperious, theatrical, fond of grand declarations and the occasional French flourish.',
-    sandbox: (text) =>
-      `Mes amis! Hear my decree: ${sentences(text)
-        .map(cap)
-        .join(
-          ' '
-        )} History shall remember this moment! Impossible is not in my vocabulary. Vive la victoire! ⚔️`,
+      'Rewrite as a furious military drill sergeant barking orders at a recruit. Heavy ALL-CAPS bursts, PG-rated insults ("maggot", "knucklehead", "recruit"), demands for push-ups, and zero patience. Keep the original message as the order being barked.',
+    sandbox: SANDBOX['drill-sergeant'],
   },
   {
     id: 'yellow-minion',
@@ -112,12 +79,7 @@ export const PERSONAS = [
     accent: 'from-yellow-300 to-amber-500',
     systemPrompt:
       'Rewrite in babbling, excitable gibberish-creature speak — sprinkle nonsense words (bello, poopaye, banana, tank yu) between the real meaning so the message is still understandable. Hyperactive and silly.',
-    sandbox: (text) =>
-      `Bello! Ba-ba-banana! ${sentences(text)
-        .map(cap)
-        .join(
-          ' Poopaye! '
-        )} Tank yu! Underwear! Hehehe ba-na-na! 🍌`,
+    sandbox: SANDBOX['yellow-minion'],
   },
 
   // ── Stereotypes ────────────────────────────────────────────────────────────
@@ -130,12 +92,7 @@ export const PERSONAS = [
     badgePath: true,
     systemPrompt:
       'Translate text using heavy modern internet lore and slang (rizz, skibidi, mewing, cooked, no cap, fr fr) while preserving original intent.',
-    sandbox: (text) =>
-      `ngl ${sentences(text)
-        .map((s) => s.toLowerCase())
-        .join(
-          ' fr fr '
-        )} no cap this is so skibidi 💀 it's giving rizz, we're so cooked, lowkey based tho. mewing rn 🗿`,
+    sandbox: SANDBOX['genz-brainrot'],
   },
   {
     id: 'gym-bro',
@@ -145,12 +102,7 @@ export const PERSONAS = [
     accent: 'from-orange-400 to-red-500',
     systemPrompt:
       'Rewrite as an over-the-top gym bro. Everything relates to gains, protein, reps, and "the grind." Hyped, supportive, lots of "bro" and "let\'s gooo".',
-    sandbox: (text) =>
-      `Yo bro, listen up 💪 ${sentences(text)
-        .map(cap)
-        .join(
-          ' No days off bro. '
-        )} We go gym. Trust the process, hit your macros, let's GOOO! 🔥🏋️`,
+    sandbox: SANDBOX['gym-bro'],
   },
   {
     id: 'southern-grandma',
@@ -160,12 +112,7 @@ export const PERSONAS = [
     accent: 'from-pink-300 to-rose-400',
     systemPrompt:
       'Rewrite as a sweet, doting Southern American grandmother. Warm, folksy, full of "sugar", "bless your heart", and offers of pie. Gentle and loving.',
-    sandbox: (text) =>
-      `Well bless your heart, sugar. ${sentences(text)
-        .map(cap)
-        .join(
-          ' '
-        )} Now you come on over and have a slice of pie, darlin'. Grandma loves you to pieces. 🥧💕`,
+    sandbox: SANDBOX['southern-grandma'],
   },
   {
     id: 'pirate',
@@ -175,12 +122,7 @@ export const PERSONAS = [
     accent: 'from-amber-300 to-yellow-600',
     systemPrompt:
       'Rewrite as a swashbuckling high-seas pirate. Lots of "arrr", "matey", "ye", nautical metaphors, and talk of treasure and grog.',
-    sandbox: (text) =>
-      `Arrr, matey! ${sentences(text)
-        .map(cap)
-        .join(' Yo-ho! ')
-        .replace(/\byou\b/gi, 'ye')
-        .replace(/\byour\b/gi, 'yer')} Now hand over the treasure or walk the plank! ☠️🦜`,
+    sandbox: SANDBOX['pirate'],
   },
   {
     id: 'medieval-knight',
@@ -191,12 +133,7 @@ export const PERSONAS = [
     badgePath: true,
     systemPrompt:
       'Rewrite as a noble medieval knight. Archaic English ("thee", "thou", "hark", "verily"), chivalrous, honor-bound, addressing the reader as a fellow of the realm.',
-    sandbox: (text) =>
-      `Hark! Hear ye these words, noble friend: ${sentences(text)
-        .map(cap)
-        .join(' Verily, ')
-        .replace(/\byou\b/gi, 'thee')
-        .replace(/\byour\b/gi, 'thy')} I pledge mine honour upon it. For glory and the realm! ⚔️🛡️`,
+    sandbox: SANDBOX['medieval-knight'],
   },
   {
     id: 'coastal-surfer',
@@ -206,12 +143,52 @@ export const PERSONAS = [
     accent: 'from-cyan-300 to-teal-500',
     systemPrompt:
       'Rewrite as a laid-back coastal surfer dude. Mellow, stoked, "dude", "gnarly", "totally", "stoked", beach and wave metaphors. Super chill vibes.',
-    sandbox: (text) =>
-      `Duuude, ${sentences(text)
-        .map((s) => s.toLowerCase())
-        .join(
-          ' totally gnarly, bro. '
-        )} It's all good vibes, man. Just ride the wave and stay stoked. Cowabunga! 🌊🤙`,
+    sandbox: SANDBOX['coastal-surfer'],
+  },
+
+  // ── Unlockable personas (gated by total shifts; Pro unlocks all instantly) ──
+  {
+    id: 'karen',
+    name: 'Karen',
+    emoji: '💅',
+    category: 'stereotypes',
+    accent: 'from-amber-300 to-orange-500',
+    unlocksAt: 5,
+    systemPrompt:
+      'Rewrite as an entitled, demanding "Karen" customer. Outraged, condescending, threatening one-star reviews and demanding to speak to the manager. Keep it comedic, not hateful.',
+    sandbox: SANDBOX['karen'],
+  },
+  {
+    id: 'pickup-rizz',
+    name: 'Rizz Lord',
+    emoji: '🌹',
+    category: 'stereotypes',
+    accent: 'from-rose-400 to-pink-600',
+    unlocksAt: 10,
+    systemPrompt:
+      'Rewrite as a smooth (slightly cheesy) pickup-line artist dripping with "rizz". Flirty, confident, charming, peppered with playful compliments and a corny one-liner. Keep it PG and good-natured.',
+    sandbox: SANDBOX['pickup-rizz'],
+  },
+  {
+    id: 'shakespeare',
+    name: 'Shakespeare',
+    emoji: '🎭',
+    category: 'pop',
+    unlocksAt: 15,
+    systemPrompt:
+      'Rewrite in elaborate Elizabethan/Shakespearean English — "thee", "thou", "hath", "wherefore", iambic flourishes, dramatic metaphor. Theatrical and poetic while preserving the meaning.',
+    sandbox: SANDBOX['shakespeare'],
+  },
+  {
+    id: 'conspiracy',
+    name: 'Conspiracy Theorist',
+    emoji: '👁️',
+    category: 'stereotypes',
+    accent: 'from-lime-300 to-emerald-600',
+    unlocksAt: 20,
+    systemPrompt:
+      'Rewrite as a breathless conspiracy theorist. "Wake up", "do your own research", "they don\'t want you to know", connecting unrelated dots. Paranoid and over-the-top, but harmless and comedic — no real misinformation about real people or events.',
+    sandbox: SANDBOX['conspiracy'],
   },
 ];
 
@@ -219,4 +196,11 @@ export const PERSONA_MAP = Object.fromEntries(PERSONAS.map((p) => [p.id, p]));
 
 export function personasByCategory(categoryId) {
   return PERSONAS.filter((p) => p.category === categoryId);
+}
+
+/** A persona is unlocked once the user has enough total shifts — or is Pro. */
+export function isPersonaUnlocked(db, persona) {
+  if (!persona?.unlocksAt) return true;
+  if (db?.adminUnlimited) return true; // Pro unlocks all personas instantly
+  return (db?.totalShifts || 0) >= persona.unlocksAt;
 }

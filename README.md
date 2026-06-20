@@ -8,14 +8,16 @@ Built with **Vite + React + Tailwind CSS + Lucide**, mobile-first, dark-mode by 
 
 ## ✨ Features
 
-- **12 personas** across three categories:
+- **16 personas** across three categories (some level-locked):
   - **Utilities** — De-Claw, Corporate Polish
-  - **Pop Culture** — Cartoon Mouse, Dr. Evil, Napoleon, Yellow Minion
-  - **Stereotypes** — Gen-Z Brainrot, Gym Bro, Southern Grandma, High-Seas Pirate, Medieval Knight, Coastal Surfer
+  - **Pop Culture** — Cartoon Mouse, Dr. Evil, Drill Sergeant, Yellow Minion, Shakespeare 🔒
+  - **Stereotypes** — Gen-Z Brainrot, Gym Bro, Southern Grandma, High-Seas Pirate, Medieval Knight, Coastal Surfer, Karen 🔒, Rizz Lord 🔒, Conspiracy Theorist 🔒
+  - 🔒 = unlocks after a number of total shifts (Karen 5, Rizz Lord 10, Shakespeare 15, Conspiracy 20). Pro unlocks all instantly.
 - **Live chat preview** — a smartphone mockup with a grey incoming bubble (original) and a glowing neon outgoing bubble (transformed).
-- **Gamification engine** — consecutive-day streaks, per-persona usage stats, karma points, an animated `+Aura` score, rank/badge ladders, and an **Aura Trophies** modal.
-- **Action dashboard** — `⚡ Copy & Switch to Chat` (copies the output and opens the native Messages composer via an `sms:` link) and `📸 Download Aura Card` (renders a social-ready PNG via `html2canvas`).
-- **Micro-SaaS paywall** — 5 free shifts/day, then an animated subscription modal (Monthly $2.99 / Annual Legend $29).
+- **Gamification engine** — consecutive-day streaks, per-persona usage stats, karma points, an animated `+Aura` score with **3× CRITICAL HIT** jackpots and a **daily first-shift bonus**, rank/badge ladders, near-miss "N to rank up" nudges, and an **Aura Trophies** modal.
+- **Action dashboard** — `⚡ Send to Chat` uses the **Web Share API** to open the native share sheet (iMessage, WhatsApp, Instagram, …) with clipboard fallback on desktop; `📸 Share Aura Card` renders a branded social-ready PNG via `html2canvas` and shares it through the same sheet.
+- **Referral loop** — every user gets an invite link (`?ref=CODE`); friends who join with it receive bonus shifts. Surfaced in the header (🎁) and inside the paywall as the free path.
+- **Micro-SaaS paywall** — 5 free shifts/day (+ referral bonus pool), then an animated subscription modal (Monthly $2.99 / Annual Legend $29) that also unlocks every persona.
 - **Resilient API layer** — uses the Anthropic Messages API when a key is set; otherwise runs **Sandbox Demo Mode** with curated client-side templates so it's interactive out of the box. If a live call fails, it gracefully falls back to the sandbox template.
 
 ---
@@ -100,3 +102,18 @@ text-aura/
 npm run build     # outputs to dist/
 npm run preview   # preview the production build
 ```
+
+---
+
+## 🚧 Productionizing (before charging money)
+
+This is a polished **front-end prototype**. All state lives in `localStorage`, which means:
+
+- **Usage limits, subscriptions, and the admin backdoor are client-side only** — a user can clear storage (or open incognito) to reset their free shifts. Real enforcement needs server-side accounts + usage metering.
+- **The API key ships to the browser** in live mode (`dangerouslyAllowBrowser`). Before launch, move the LLM call behind a **backend proxy** that holds the key server-side and rate-limits per account.
+- **Payments are simulated** (the subscribe button just unlocks locally). Wire up **Stripe** (or similar) for real billing.
+- **Referrals are one-sided** — the invited user gets the bonus client-side, but crediting the *referrer* requires the backend to verify a real signup.
+
+Recommended path to monetization: **backend proxy → accounts/auth → server-side limits & referrals → Stripe.** This repo is the front-end those services plug into.
+
+> Tip: keep the Aura Card watermark even on paid plans — every shared screenshot is free distribution. Set your real domain/handle in [`src/config.js`](src/config.js).

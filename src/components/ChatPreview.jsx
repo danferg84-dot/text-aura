@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import { Loader2, Sparkles, Signal, Wifi, BatteryFull } from 'lucide-react';
 import { PERSONA_MAP } from '../services/personas';
+import { HANDLE } from '../config';
 
 /**
  * High-end smartphone mockup.
@@ -100,9 +101,15 @@ const ChatPreview = forwardRef(function ChatPreview(
                     {auraPing && (
                       <span
                         key={auraPing.id}
-                        className="animate-float-up bg-gradient-to-r from-aura-mint to-aura-neon bg-clip-text text-sm font-extrabold text-transparent drop-shadow"
+                        className={[
+                          'animate-float-up bg-clip-text font-extrabold text-transparent drop-shadow',
+                          auraPing.crit
+                            ? 'bg-gradient-to-r from-aura-gold to-orange-400 text-base'
+                            : 'bg-gradient-to-r from-aura-mint to-aura-neon text-sm',
+                        ].join(' ')}
                       >
-                        +{auraPing.amount.toLocaleString()} Aura
+                        {auraPing.crit && '⚡ CRIT 3× '}
+                        {auraPing.daily && '🎁 '}+{auraPing.amount.toLocaleString()} Aura
                       </span>
                     )}
                   </div>
@@ -117,9 +124,12 @@ const ChatPreview = forwardRef(function ChatPreview(
             )}
           </div>
 
-          {/* Watermark for exported cards */}
-          <div className="flex items-center justify-center gap-1 border-t border-white/5 py-2 text-[10px] font-semibold tracking-wide text-slate-500">
-            <Sparkles className="h-3 w-3 text-aura-violet" /> made with TEXT AURA
+          {/* Watermark for exported cards — every shared screenshot is an ad */}
+          <div className="flex items-center justify-center gap-1.5 border-t border-white/5 py-2 text-[10px] font-semibold tracking-wide text-slate-400">
+            <Sparkles className="h-3 w-3 text-aura-violet" />
+            <span>made with TEXT AURA</span>
+            <span className="text-slate-600">·</span>
+            <span className="text-aura-neon">{HANDLE}</span>
           </div>
         </div>
       </div>

@@ -1,7 +1,8 @@
-import { Flame, Zap, Trophy, Infinity as InfinityIcon } from 'lucide-react';
+import { Flame, Zap, Trophy, Sparkles, Gift, Infinity as InfinityIcon } from 'lucide-react';
 import { DAILY_FREE_LIMIT } from '../services/storage';
+import AuraMark from './AuraMark';
 
-export default function Header({ streak, remaining, onOpenTrophies }) {
+export default function Header({ streak, remaining, aura, onOpenTrophies, onOpenInvite }) {
   const unlimited = remaining === Infinity;
 
   return (
@@ -9,9 +10,7 @@ export default function Header({ streak, remaining, onOpenTrophies }) {
       <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
         {/* Title */}
         <div className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-aura-neon to-aura-violet shadow-neon">
-            <Zap className="h-5 w-5 text-white" strokeWidth={2.5} />
-          </span>
+          <AuraMark className="h-9 w-9 drop-shadow-[0_0_8px_rgba(168,85,247,0.55)]" />
           <h1 className="font-display text-lg font-bold tracking-tight sm:text-xl">
             <span className="neon-text">TEXT AURA</span>
           </h1>
@@ -19,6 +18,16 @@ export default function Header({ streak, remaining, onOpenTrophies }) {
 
         {/* Stats */}
         <div className="flex items-center gap-2">
+          {/* Total Aura (XP) */}
+          <div
+            className="chip border-aura-mint/40 bg-aura-mint/10 text-emerald-100"
+            title="Total Aura earned (XP)"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-aura-mint" strokeWidth={2.5} />
+            <span className="tabular-nums font-semibold">{(aura || 0).toLocaleString()}</span>
+            <span className="hidden text-emerald-300/70 sm:inline">Aura</span>
+          </div>
+
           {/* Streak */}
           <div
             className="chip border-orange-400/30 bg-orange-400/10 text-orange-200"
@@ -49,6 +58,16 @@ export default function Header({ streak, remaining, onOpenTrophies }) {
               </>
             )}
           </div>
+
+          {/* Invite */}
+          <button
+            onClick={onOpenInvite}
+            className="grid h-8 w-8 place-items-center rounded-full border border-aura-mint/40 bg-aura-mint/10 text-aura-mint transition hover:bg-aura-mint/20 active:scale-95"
+            title="Invite friends"
+            aria-label="Invite friends"
+          >
+            <Gift className="h-4 w-4" strokeWidth={2.4} />
+          </button>
 
           {/* Trophies */}
           <button

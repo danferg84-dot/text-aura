@@ -1,5 +1,6 @@
-import { Crown, Check, Sparkles } from 'lucide-react';
+import { Crown, Check, Sparkles, Gift } from 'lucide-react';
 import Modal from './Modal';
+import useSecretTaps from '../hooks/useSecretTaps';
 
 const PLANS = [
   {
@@ -7,7 +8,7 @@ const PLANS = [
     name: 'Monthly Pass',
     price: '$2.99',
     period: '/ mo',
-    perks: ['Unlimited daily shifts', 'All 12 personas', 'Priority aura engine'],
+    perks: ['Unlimited daily shifts', 'All personas unlocked instantly', 'Priority aura engine'],
     highlight: false,
   },
   {
@@ -20,7 +21,11 @@ const PLANS = [
   },
 ];
 
-export default function PaywallModal({ open, onClose, onSubscribe }) {
+export default function PaywallModal({ open, onClose, onSubscribe, onAdminUnlock, onInvite }) {
+  // Same hidden backdoor as the footer — reachable here since the paywall
+  // overlays the footer when you're blocked. Tap "5 free shifts" 5×.
+  const { count, required, onTap } = useSecretTaps(onAdminUnlock || (() => {}));
+
   return (
     <Modal
       open={open}
@@ -29,9 +34,21 @@ export default function PaywallModal({ open, onClose, onSubscribe }) {
       icon={<Crown className="h-5 w-5 text-aura-gold" />}
     >
       <p className="mb-4 text-sm text-slate-300">
-        You've used all <span className="font-semibold text-white">5 free shifts</span> today. Go
-        Legend for unlimited aura transformations. ⚡
+        You've used all{' '}
+        <button
+          onClick={onTap}
+          className="font-semibold text-white underline decoration-dotted underline-offset-2"
+          title="Text Aura"
+        >
+          5 free shifts
+        </button>{' '}
+        today. Go Legend for unlimited aura transformations. ⚡
       </p>
+      {count > 0 && (
+        <p className="-mt-2 mb-3 text-[11px] text-aura-violet/80">
+          🔓 Admin unlock: {count}/{required} taps…
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {PLANS.map((plan) => (
@@ -73,9 +90,20 @@ export default function PaywallModal({ open, onClose, onSubscribe }) {
         ))}
       </div>
 
+      {/* Free path: invite friends for bonus shifts */}
+      {onInvite && (
+        <button
+          onClick={onInvite}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-aura-mint/40 bg-aura-mint/10 py-2.5 text-sm font-semibold text-aura-mint transition hover:bg-aura-mint/20"
+        >
+          <Gift className="h-4 w-4" />
+          Or invite friends for free shifts →
+        </button>
+      )}
+
       <button
         onClick={onClose}
-        className="mt-4 w-full text-center text-xs text-slate-500 transition hover:text-slate-300"
+        className="mt-3 w-full text-center text-xs text-slate-500 transition hover:text-slate-300"
       >
         Maybe later — I'll wait for tomorrow's free shifts
       </button>
